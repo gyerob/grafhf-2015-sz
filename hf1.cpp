@@ -152,11 +152,18 @@ struct Parabola {
 	bool intersected;
 	int numpoints;
 	float c;
+	float ldist, fdist;
+	float worldx, worldy;
 
 	Parabola() {
 		numpoints = 0;
 		c = 0.0f;
 		intersected = false;
+		fdist = 0.0f;
+		ldist = 0.0f;
+
+		worldx = 0.0f;
+		worldy = 0.0f;
 	}
 
 	void addCP(float x, float y) {
@@ -168,9 +175,11 @@ struct Parabola {
 			focus.x = x;
 			focus.y = y;
 			directix = directixpoints[1] - directixpoints[0];
+//			directix = directix * 1000;
 			normal.x = directix.y;
 			normal.y = -directix.x;
 			normal = normal * (1 / normal.Length());
+
 			c = normal.x * directixpoints[0].x + normal.y * directixpoints[0].y;
 			//cout << "normál: " << normal.x << " " << normal.y << " c= " << c					<< "\n" << flush;
 			//c=directix.y*directixpoints[0].x-directix.x*directixpoints[0].y;
@@ -179,9 +188,10 @@ struct Parabola {
 	}
 
 	bool isintersecting(Vector v) {
-		float fdist = (v - focus).Length();
-		float ldist = (fabs(normal.x * v.x + normal.y * v.y - c))
+		fdist = (v - focus).Length();
+		ldist = (fabs(normal.x * v.x + normal.y * v.y - c))
 				/ (sqrt(normal.x * normal.x + normal.y * normal.y));
+		Vector n2 = normal;
 
 		if (fabs((fabs(fdist) - fabs(ldist))) < 0.01f) {// && !intersected) {
 			//http://www.inf.unideb.hu/oktatas/mobidiak/Papp_Ildiko/Konstruktiv_geometria/gorbe.pdf 8. oldal
@@ -189,9 +199,44 @@ struct Parabola {
 			intersectpoint = v;
 			temp = (v - focus);
 			float intdist = temp.Length();
-			temp2 = v + (normal * intdist);
+
+			bool valto = false;
+			for (float Y = 0; Y < screenHeight; Y++) {
+				worldy =
+						((((screenHeight - (float) Y) / screenHeight) * 2) - 1);
+
+				if (fabs(focus.x * normal.x + worldy * normal.y - c) <= 0.02f
+						&& !valto) {
+					if ((directixpoints[0].x < directixpoints[1].x)
+							&& focus.y < worldy) {
+						n2 = normal * -1;
+						//cout << worldy << "\n" << flush;
+						valto = true;
+					} else if ((directixpoints[0].x > directixpoints[1].x)
+							&& focus.y > worldy) {
+						n2 = normal * -1;
+						//cout << worldy << "\n" << flush;
+						valto = true;
+					}
+				}
+
+			}
+
+			if (!valto) {
+				worldy = (c - normal.x * focus.x) / normal.y;
+				//cout << worldy << "\n" << flush;
+				if ((directixpoints[0].x < directixpoints[1].x)
+						&& focus.y < worldy) {
+					n2 = normal * -1;
+				} else if ((directixpoints[0].x > directixpoints[1].x)
+						&& focus.y > worldy) {
+					n2 = normal * -1;
+				}
+			}
+
+			temp2 = v + (n2 * intdist);
 			tangentpoint = temp2 + ((focus - temp2) * 0.5f);
-			intersectdirection = (tangentpoint - v) * 10;
+			intersectdirection = (tangentpoint - v) * (10/(tangentpoint - v).Length());
 			return true;
 		} else {
 			return false;
@@ -199,10 +244,11 @@ struct Parabola {
 	}
 
 	bool isinside(Vector v) {
-		float fdist = (v - focus).Length();
-		float ldist = (fabs(normal.x * v.x + normal.y * v.y - c))
+		fdist = (v - focus).Length();
+		ldist = (fabs(normal.x * v.x + normal.y * v.y - c))
 				/ (sqrt(normal.x * normal.x + normal.y * normal.y));
 		//float ldist = (fabs(directix.y*v.x+directix.x*v.y+c))/(sqrt(directix.y*directix.y+directix.x*directix.x));
+		//if (fabs(fabs(fdist) - (ldist)) < 0.001) {
 		if (fabs(fdist) <= (ldist)) {
 			return true;
 		} else
@@ -210,9 +256,29 @@ struct Parabola {
 	}
 
 	void draw() {
+		/*if (numpoints > 1) {
+		 glColor3f(0, 0, 0);
+		 glBegin(GL_POINTS);
+		 //glBegin(GL_LINE_STRIP);
+		 for (float Y = 0; Y < screenHeight; Y++) {
+		 for (float X = 0; X < screenWidth; X++) {
+		 //for (float Y = 0; Y < screenHeight; Y += 0.5f) {
+		 //	for (float X = 0; X < screenWidth; X += 0.5f) {
+		 worldx = -((((screenWidth - (float) X) / screenWidth) * 2)
+		 - 1);
+		 worldy = ((((screenHeight - (float) Y) / screenHeight) * 2)
+		 - 1);
+
+		 if (fabs(worldx * normal.x + worldy * normal.y - c)
+		 <= 0.002f) {
+		 glVertex2f(worldx, worldy);
+		 }
+		 }
+		 }
+		 glEnd();
+		 }*/
 		if (numpoints > 2) {
 			//cout << "parabolarajz\n" << flush;
-			float worldx, worldy;
 			//glPointSize(1);
 			glBegin(GL_POINTS);
 			//glBegin(GL_LINE_STRIP);
@@ -229,17 +295,37 @@ struct Parabola {
 						glColor3f(1, 1, 0);
 						glVertex2f(worldx, worldy);
 						//image[screenHeight-1-Y][X] = Color(1, 1, 0);
-					} /*else {
-					 glColor3f(0, 1, 1);
-					 //glVertex2f(worldx, worldy);
-					 //image[screenHeight-1-Y][X] = Color(0, 1, 1);
-					 }*/
-					//glVertex2f(worldx, worldy);
+					}
 				}
 			}
 			glEnd();
+			/*
+			 bool first = false;
+			 Vector f;
 
-			glPointSize(4);
+			 glColor3f(1, 1, 0);
+			 glBegin(GL_TRIANGLE_FAN);
+			 glVertex2f(focus.x, focus.y);
+			 for (float X = -300; X < screenHeight + 300; X++) {
+			 for (float Y = -300; Y < screenWidth + 300; Y++) {
+			 worldx = -((((screenWidth - (float) X) / screenWidth) * 2)
+			 - 1);
+			 worldy = ((((screenHeight - (float) Y) / screenHeight) * 2)
+			 - 1);
+			 Vector v(worldx, worldy, 0);
+			 if (isinside(v)) {
+			 if (!first) {
+			 f = v;
+			 first = true;
+			 }
+			 glVertex2f(worldx, worldy);
+			 }
+			 }
+			 }
+			 glVertex2f(f.x, f.y);
+			 glEnd();
+			 */
+			//glPointSize(4);
 			/*glBegin(GL_POINTS);
 			 glColor3f(0, 1, 0);
 			 glVertex2f(tangentpoint.x, tangentpoint.y);
@@ -426,7 +512,7 @@ struct Spline {
 				glBegin(GL_LINES);
 				//for (float t = (ido[intersecti] - 100);	t < ido[intersecti] + 100; t++) {
 				v = Hermitederive(intersecti, intersecttime);
-				v = v * 1000;
+				v = v * (10/v.Length());
 				glVertex2f(intersectpoint.x + v.x, intersectpoint.y + v.y);
 				glVertex2f(intersectpoint.x - v.x, intersectpoint.y - v.y);
 				//}
@@ -479,17 +565,17 @@ void onDisplay() {
 	 glVertex2f(0.0f, -0.9f);
 	 glEnd();
 	 */
-	/*
-	 glColor3f(1, 1, 1);
-	 glBegin(GL_LINES);
-	 glVertex2f(-1.0f, 0.0f);
-	 glVertex2f(1.0f, 0.0f);
-	 glEnd();
-	 glBegin(GL_LINES);
-	 glVertex2f(0.0f, 1.0f);
-	 glVertex2f(0.0f, -1.0f);
-	 glEnd();
-	 */
+
+	glColor3f(1, 1, 1);
+	glBegin(GL_LINES);
+	glVertex2f(-1.0f, 0.0f);
+	glVertex2f(1.0f, 0.0f);
+	glEnd();
+	glBegin(GL_LINES);
+	glVertex2f(0.0f, 1.0f);
+	glVertex2f(0.0f, -1.0f);
+	glEnd();
+
 	/*
 	 glPointSize(4);
 	 glBegin(GL_POINTS);
@@ -700,7 +786,7 @@ void onIdle() {
 		oldtime = time;
 	}
 
-	glutPostRedisplay();
+	//glutPostRedisplay();
 }
 
 // ...Idaig modosithatod
